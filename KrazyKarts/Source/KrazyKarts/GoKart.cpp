@@ -4,6 +4,8 @@
 
 #include "Components/InputComponent.h"
 
+#include "DrawDebugHelpers.h"
+
 // Sets default values
 AGoKart::AGoKart()
 {
@@ -19,24 +21,98 @@ void AGoKart::BeginPlay()
 	
 }
 
+FString GetNetRoleAsString(ENetRole Role)
+{
+	const UEnum* EnumPtr = FindObject<UEnum>(ANY_PACKAGE, TEXT("ENetRole"), true);
+	if (!EnumPtr) return FString("Invalid");
+
+	return EnumPtr->GetNameStringByIndex((int32)Role);
+}
+
 // Called every frame
 void AGoKart::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	
+	FVector Force = GetActorForwardVector() * MaxDrivingForce * Throttle;
 
+	Force += GetAirResistance();
+	Force += GetRollingResistance();
+
+	FVector Acceleration = Force / Mass;
+
+	Velocity += Acceleration * DeltaTime;
+
+	ApplyRotation(DeltaTime);
+
+	UpdateLocationFromVelocity(DeltaTime);
+
+	DrawDebugString(GetWorld(), FVector(0, 0, 100), GetNetRoleAsString(GetLocalRole()), this, FColor::White, DeltaTime);
+}
+
+FVector AGoKart::GetAirResistance()
+{
+	return -Velocity.GetSafeNormal() * Velocity.SizeSquared() * DragCoefficient;
+}
+
+FVector AGoKart::GetRollingResistance()
+{
+	float AccelerationDueToGravity = -GetWorld()->GetGravityZ() / 100.f; // g
+	float NormalForce = Mass * AccelerationDueToGravity;
+	return -Velocity.GetSafeNormal() * RollingCoefficient * NormalForce;
+}
+
+void AGoKart::ApplyRotation(float DeltaTime)
+{
+	float DeltaLocation = FVector::DotProduct(GetActorForwardVector(), Velocity.GetSafeNormal()) * Velocity.Size() * DeltaTime;
+	float RotationAngle = DeltaLocation / MinTurningRadius * SteeringThrow;
+	FQuat RotationDelta = FQuat(GetActorUpVector(), RotationAngle);
+
+	Velocity = RotationDelta.RotateVector(Velocity);
+
+	AddActorWorldRotation(RotationDelta);
+}
+
+void AGoKart::UpdateLocationFromVelocity(float DeltaTime)
+{
 	FVector Translation = Velocity * 100 * DeltaTime;
 
-	AddActorWorldOffset(Translation);
+	FHitResult Result;
+
+	AddActorWorldOffset(Translation, true, &Result);
+
+	if (Result.IsValidBlockingHit())
+	{
+		Velocity = FVector::ZeroVector;
+	}
 }
 
 // Called to bind functionality to input
 void AGoKart::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
-	PlayerInputComponent->BindAxis("MoveForward", this, &AGoKart::MoveForward);
+	PlayerInputComponent->BindAxis("MoveForward", this, &AGoKart::C2S_MoveForward);
+	PlayerInputComponent->BindAxis("MoveRight", this, &AGoKart::C2S_MoveRight);
 }
 
-void AGoKart::MoveForward(float Value)
+bool AGoKart::C2S_MoveForward_Validate(float Value)
 {
-	Velocity = GetActorForwardVector() * 20 * Value;
+	return FMath::Abs(Value) <= 1.f;
+}
+
+void AGoKart::C2S_MoveForward_Implementation(float Value)
+{
+	Throttle = Value;
+}
+
+void AGoKart::C2S_MoveRight_Implementation(float Value)
+{
+	SteeringThrow = Value;
+}
+
+bool AGoKart::C2S_MoveRight_Validate(float Value)
+{
+	if (Value > 1.f) return false;
+
+	return true;
 }

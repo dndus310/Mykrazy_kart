@@ -200,7 +200,7 @@ void AKrazyKartsPawn::Tick(float Delta)
 	SetupInCarHUD();
 
 	bool bHMDActive = false;
-#if HMD_MODULE_INCLUDED
+#if 0
 	if ((GEngine->HMDDevice.IsValid() == true) && ((GEngine->HMDDevice->IsHeadTrackingAllowed() == true) || (GEngine->IsStereoscopic3D() == true)))
 	{
 		bHMDActive = true;
@@ -210,10 +210,10 @@ void AKrazyKartsPawn::Tick(float Delta)
 	{
 		if ( (InputComponent) && (bInCarCameraActive == true ))
 		{
-			FRotator HeadRotation = InternalCamera->RelativeRotation;
+			FRotator HeadRotation = InternalCamera->GetRelativeRotation();
 			HeadRotation.Pitch += InputComponent->GetAxisValue(LookUpBinding);
 			HeadRotation.Yaw += InputComponent->GetAxisValue(LookRightBinding);
-			InternalCamera->RelativeRotation = HeadRotation;
+			InternalCamera->SetRelativeRotation(HeadRotation);
 		}
 	}
 }
@@ -223,7 +223,7 @@ void AKrazyKartsPawn::BeginPlay()
 	Super::BeginPlay();
 
 	bool bEnableInCar = false;
-#if HMD_MODULE_INCLUDED
+#if 0
 	bEnableInCar = UHeadMountedDisplayFunctionLibrary::IsHeadMountedDisplayEnabled();
 #endif // HMD_MODULE_INCLUDED
 	EnableIncarView(bEnableInCar,true);
@@ -231,7 +231,7 @@ void AKrazyKartsPawn::BeginPlay()
 
 void AKrazyKartsPawn::OnResetVR()
 {
-#if HMD_MODULE_INCLUDED
+#if 0
 	if (GEngine->HMDDevice.IsValid())
 	{
 		GEngine->HMDDevice->ResetOrientationAndPosition();

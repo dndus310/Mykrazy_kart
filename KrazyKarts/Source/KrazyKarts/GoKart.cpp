@@ -1,24 +1,37 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "GoKart.h"
+#include "DrawDebugHelpers.h"
+#include "Net/UnrealNetwork.h"
+#include "Kismet/KismetMathLibrary.h"
 
 #include "Components/InputComponent.h"
 
-#include "DrawDebugHelpers.h"
+#include "GoKart.h"
+
 
 // Sets default values
 AGoKart::AGoKart()
 {
- 	// Set this pawn to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
+	bReplicates = true;
 }
 
-// Called when the game starts or when spawned
+void AGoKart::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AGoKart, ReplicatedTransform);
+}
+
 void AGoKart::BeginPlay()
 {
 	Super::BeginPlay();
 	
+	//if (HasAuthority())
+	//{
+	//	NetUpdateFrequency = 1.f;
+	//}
 }
 
 FString GetNetRoleAsString(ENetRole Role)
@@ -29,7 +42,6 @@ FString GetNetRoleAsString(ENetRole Role)
 	return EnumPtr->GetNameStringByIndex((int32)Role);
 }
 
-// Called every frame
 void AGoKart::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -47,6 +59,20 @@ void AGoKart::Tick(float DeltaTime)
 
 	UpdateLocationFromVelocity(DeltaTime);
 
+	if (HasAuthority())
+	{
+		ReplicatedTransform = GetActorTransform();
+	}
+
+	if (IsReplicatedTransform)
+	{
+		FTransform InterpTransform = UKismetMathLibrary::TInterpTo(GetActorTransform(), ReplicatedTransform, DeltaTime, 1.f);
+		SetActorTransform(InterpTransform);
+
+		if (InterpTransform.Equals(ReplicatedTransform))
+			IsReplicatedTransform = false;
+	}
+	
 	DrawDebugString(GetWorld(), FVector(0, 0, 100), GetNetRoleAsString(GetLocalRole()), this, FColor::White, DeltaTime);
 }
 
@@ -91,11 +117,16 @@ void AGoKart::UpdateLocationFromVelocity(float DeltaTime)
 void AGoKart::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
-	PlayerInputComponent->BindAxis("MoveForward", this, &AGoKart::C2S_MoveForward);
-	PlayerInputComponent->BindAxis("MoveRight", this, &AGoKart::C2S_MoveRight);
+	PlayerInputComponent->BindAxis("MoveForward", this, &AGoKart::MoveForward);
+	PlayerInputComponent->BindAxis("MoveRight", this, &AGoKart::MoveRight);
 }
 
 bool AGoKart::C2S_MoveForward_Validate(float Value)
+{
+	return FMath::Abs(Value) <= 1.f;
+}
+
+bool AGoKart::C2S_MoveRight_Validate(float Value)
 {
 	return FMath::Abs(Value) <= 1.f;
 }
@@ -110,9 +141,21 @@ void AGoKart::C2S_MoveRight_Implementation(float Value)
 	SteeringThrow = Value;
 }
 
-bool AGoKart::C2S_MoveRight_Validate(float Value)
+void AGoKart::MoveForward(float Value)
 {
-	if (Value > 1.f) return false;
-
-	return true;
+	Throttle = Value;
+	C2S_MoveForward(Throttle);
 }
+
+void AGoKart::MoveRight(float Value)
+{
+	SteeringThrow = Value;
+	C2S_MoveRight(SteeringThrow);
+}
+
+void AGoKart::OnRep_ReplicatedTransform()
+{
+
+	IsReplicatedTransform = true;
+}
+

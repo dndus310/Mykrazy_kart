@@ -16,6 +16,8 @@ public:
 	AGoKart();
 
 protected:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
@@ -56,11 +58,21 @@ private:
 	void C2S_MoveForward_Implementation(float Value);
 	bool C2S_MoveForward_Validate(float Value);
 	
-
 	UFUNCTION(Server, Reliable, WithValidation)
 	void C2S_MoveRight(float Value);
 	void C2S_MoveRight_Implementation(float Value);
 	bool C2S_MoveRight_Validate(float Value);
+
+	void MoveForward(float Value);
+	void MoveRight(float Value);
+
+	UPROPERTY(ReplicatedUsing= OnRep_ReplicatedTransform)
+	FTransform ReplicatedTransform;
+
+	UFUNCTION()
+	virtual void OnRep_ReplicatedTransform();
+
+	bool IsReplicatedTransform;
 
 	FVector Velocity;
 	FVector RotationVelocity;

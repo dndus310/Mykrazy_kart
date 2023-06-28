@@ -6,6 +6,37 @@
 #include "GameFramework/Pawn.h"
 #include "GoKart.generated.h"
 
+USTRUCT()
+struct FGoKartMove
+{
+	GENERATED_USTRUCT_BODY()
+
+	UPROPERTY()
+	float Throttle;
+
+	UPROPERTY()
+	float SteeringThrow;
+
+	UPROPERTY()
+	float DeltaTime;
+};
+
+USTRUCT()
+struct FGoKartState
+{
+	GENERATED_USTRUCT_BODY()
+
+	UPROPERTY()
+	FTransform Transform;
+		
+	UPROPERTY()
+	FVector Velocity;
+
+	UPROPERTY()
+	FGoKartMove LastMove;
+
+};
+
 UCLASS()
 class KRAZYKARTS_API AGoKart : public APawn
 {
@@ -22,17 +53,17 @@ protected:
 	virtual void BeginPlay() override;
 
 public:	
+	void SimulateMove(FGoKartMove Move);
+
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
-	UFUNCTION(BlueprintCallable)
 	FVector GetAirResistance();
-
 	FVector GetRollingResistance();
 
-	void ApplyRotation(float DeltaTime);
+	void ApplyRotation(FGoKartMove Move);
 
-	void UpdateLocationFromVelocity(float DeltaTime);
+	void UpdateLocationFromVelocity(FGoKartMove Move);
 
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -54,30 +85,19 @@ public:
 	
 private:
 	UFUNCTION(Server, Reliable, WithValidation)
-	void C2S_MoveForward(float Value);
-	void C2S_MoveForward_Implementation(float Value);
-	bool C2S_MoveForward_Validate(float Value);
-	
-	UFUNCTION(Server, Reliable, WithValidation)
-	void C2S_MoveRight(float Value);
-	void C2S_MoveRight_Implementation(float Value);
-	bool C2S_MoveRight_Validate(float Value);
+	void C2S_Move(FGoKartMove Move);
 
 	void MoveForward(float Value);
 	void MoveRight(float Value);
 
-	UPROPERTY(ReplicatedUsing=OnRep_ReplicatedTransform)
-	FTransform ReplicatedTransform;
-	
-	UPROPERTY(Replicated)
+	UPROPERTY(ReplicatedUsing=OnRep_ReplicatedState)
+	FGoKartState ServerState;
+
 	FVector Velocity;
-	
-	UFUNCTION()
-	virtual void OnRep_ReplicatedTransform();
 
-	UPROPERTY(Replicated)
 	float Throttle;
-
-	UPROPERTY(Replicated)
 	float SteeringThrow;
+
+	UFUNCTION()
+	virtual void OnRep_ReplicatedState();
 };
